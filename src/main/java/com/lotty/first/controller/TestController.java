@@ -227,6 +227,7 @@ public class TestController {
 			}))
 			.limit(6)
 			.map(Map.Entry::getKey)
+			.sorted((e1, e2) -> Integer.compare(e1, e2))
 			.map(n -> n.toString())
 			.collect(Collectors.joining( " " ));
 	}

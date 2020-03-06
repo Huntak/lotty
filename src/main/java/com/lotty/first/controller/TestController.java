@@ -7,8 +7,10 @@ import java.io.Reader;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -42,7 +44,7 @@ public class TestController {
 	}
 
 	@GetMapping("/test")
-	public JSONArray test() {
+	public String test() {
 		// 지난회차 로또번호 조회
 		JSONArray prevLottoList = readPrevLottoData();
 
@@ -50,33 +52,32 @@ public class TestController {
 		ConcurrentHashMap<Integer, Integer> lottoNumCount = countPrevLotto(prevLottoList);
 
 		// 상위 10개 최대값, 인덱스 구하기
-		List<Entry<Integer, Integer>> topNLottoNum = lottoNumCount.entrySet()
-																	.stream()
-																	.sorted((e1, e2) -> Integer.compare(e2.getValue(), e1.getValue())) // Sort by value.
-																	.limit(10)
-																	.collect(Collectors.toList());
+		List<Entry<Integer, Integer>> topNLottoNum = getTopNLottoNum(lottoNumCount);
 
 		// 하위 10개 최대값, 인덱스 구하기
-		List<Entry<Integer, Integer>> bottomNLottoNum = lottoNumCount.entrySet()
-																		.stream()
-																		.sorted((e1, e2) -> Integer.compare(e1.getValue(), e2.getValue())) // Sort by value.
-																		.limit(10)
-																		.collect(Collectors.toList());
+		List<Entry<Integer, Integer>> bottomNLottoNum = getBottomNLottoNum(lottoNumCount);
 
 		// TODO : 삭제 (값 확인용)
-		topNLottoNum.forEach(l -> {
-			System.out.print(l.getKey() + "번:" + l.getValue() + "회, ");
-		});
-		System.out.println("");
-		bottomNLottoNum.forEach(l -> {
-			System.out.print(l.getKey() + "번:" + l.getValue() + "회, ");
-		});
-		System.out.println("");
+//		topNLottoNum.forEach(l -> {
+//			System.out.print(l.getKey() + "번:" + l.getValue() + "회, ");
+//		});
+//		System.out.println("");
+//		bottomNLottoNum.forEach(l -> {
+//			System.out.print(l.getKey() + "번:" + l.getValue() + "회, ");
+//		});
+//		System.out.println("");
+
+		// TODO : 당첨금 수령액 높은 날 top 10
+
+		// TODO : 당첨자가 제일 많은 날 top 10
 
 		// 로또번호 추천
-		recommandLottoNum(topNLottoNum);
+		String result = recommandLottoNum(topNLottoNum);
 
-		return prevLottoList;
+		// TODO : 삭제 (값 확인용)
+		System.out.println(result);
+
+		return result;
 	}
 
 
@@ -176,7 +177,7 @@ public class TestController {
 			lotto = iterator.next();
 
 			// TODO : 삭제 (값 확인용)
-			System.out.println(lotto.get("drwtNo1") + " " + lotto.get("drwtNo2") + " " + lotto.get("drwtNo3") + " " + lotto.get("drwtNo4") + " " + lotto.get("drwtNo5") + " " + lotto.get("drwtNo6") + " " + lotto.get("bnusNo"));
+//			System.out.println(lotto.get("drwtNo1") + " " + lotto.get("drwtNo2") + " " + lotto.get("drwtNo3") + " " + lotto.get("drwtNo4") + " " + lotto.get("drwtNo5") + " " + lotto.get("drwtNo6") + " " + lotto.get("bnusNo"));
 
 			// 번호별 카운트
 			int drwtNo;
@@ -202,9 +203,32 @@ public class TestController {
 		return lottoNumCount;
 	}
 
-	private void recommandLottoNum(List<Entry<Integer, Integer>> topNLottoNum) {
-		// TODO : 로또번호 추천
+	private List<Entry<Integer, Integer>> getTopNLottoNum(ConcurrentHashMap<Integer, Integer> lottoNumCount) {
+		return lottoNumCount.entrySet()
+			.stream()
+			.sorted((e1, e2) -> Integer.compare(e2.getValue(), e1.getValue())) // Sort by value.
+			.limit(10)
+			.collect(Collectors.toList());
+	}
 
+	private List<Entry<Integer, Integer>> getBottomNLottoNum(ConcurrentHashMap<Integer, Integer> lottoNumCount) {
+		return lottoNumCount.entrySet()
+			.stream()
+			.sorted((e1, e2) -> Integer.compare(e1.getValue(), e2.getValue())) // Sort by value.
+			.limit(10)
+			.collect(Collectors.toList());
+	}
+
+	private String recommandLottoNum(List<Entry<Integer, Integer>> topNLottoNum) {
+		return topNLottoNum.stream()
+			.collect(Collectors.collectingAndThen(Collectors.toList(), collected -> {
+			    Collections.shuffle(collected);
+			    return collected.stream();
+			}))
+			.limit(6)
+			.map(Map.Entry::getKey)
+			.map(n -> n.toString())
+			.collect(Collectors.joining( " " ));
 	}
 
 

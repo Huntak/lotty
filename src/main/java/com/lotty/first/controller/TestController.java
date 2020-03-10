@@ -8,7 +8,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -25,6 +24,7 @@ import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
@@ -43,19 +43,31 @@ public class TestController {
 		return makePrevLottoData();
 	}
 
-	@GetMapping("/test")
-	public String test() {
+	/**
+	 *
+	 * prevLottoNum : 상위 N개 회차
+	 * countTopN : 가장 많이 나오는 번호 N개
+	 * countBottomN : 가장 적게 나오는 번호 N개
+	 *
+	 **/
+	@GetMapping("/lotto")
+	public String lotto(@RequestParam(value = "prevLottoNum", defaultValue = "0") int prevLottoNum
+					 , @RequestParam(value = "countTopN", defaultValue = "0") int countTopN
+					 , @RequestParam(value = "counntBottomN", defaultValue = "0") int counntBottomN) {
+		// TODO : 삭제 (값 확인용)
+		System.out.println("prevLottoNum : " + prevLottoNum + ", countTopN : " + countTopN + ", counntBottomN : " + counntBottomN);
+
 		// 지난회차 로또번호 조회
 		JSONArray prevLottoList = readPrevLottoData();
 
-		// 로또번호 카운트
-		ConcurrentHashMap<Integer, Integer> lottoNumCount = countPrevLotto(prevLottoList);
+		// 상위 N개 회차 로또번호 카운트
+		ConcurrentHashMap<Integer, Integer> lottoNumCount = countPrevLotto(prevLottoList, prevLottoNum == 0 ? 100 : prevLottoNum);
 
-		// 상위 10개 최대값, 인덱스 구하기
-		List<Entry<Integer, Integer>> topNLottoNum = getTopNLottoNum(lottoNumCount);
+		// 상위 N개 최대값, 인덱스 구하기
+		List<Entry<Integer, Integer>> topNLottoNum = getTopNLottoNum(lottoNumCount, countTopN == 0 ? 18 : countTopN);
 
-		// 하위 10개 최대값, 인덱스 구하기
-		List<Entry<Integer, Integer>> bottomNLottoNum = getBottomNLottoNum(lottoNumCount);
+		// 하위 N개 최대값, 인덱스 구하기
+		List<Entry<Integer, Integer>> bottomNLottoNum = getBottomNLottoNum(lottoNumCount, counntBottomN == 0 ? 18 : counntBottomN);
 
 		// TODO : 삭제 (값 확인용)
 //		topNLottoNum.forEach(l -> {
@@ -163,21 +175,19 @@ public class TestController {
 		return prevLottoList;
 	}
 
-	@SuppressWarnings("unchecked")
-	private ConcurrentHashMap<Integer, Integer> countPrevLotto(JSONArray prevLottoList) {
+	private ConcurrentHashMap<Integer, Integer> countPrevLotto(JSONArray prevLottoList, int prevLottoNum) {
 		JSONObject lotto = new JSONObject();
 
 		// 번호별 카운트 변수
 		ConcurrentHashMap<Integer, Integer> lottoNumCount = new ConcurrentHashMap<>();
 
 		// 회차별로 쪼개서 번호별 카운트
-		Iterator<JSONObject> iterator = prevLottoList.iterator();
-		while (iterator.hasNext()) {
+		for(int h = prevLottoList.size() - 1; h > prevLottoList.size() - prevLottoNum - 1; h--) {
 			// 로또 한 회차분
-			lotto = iterator.next();
+			lotto = (JSONObject) prevLottoList.get(h);
 
 			// TODO : 삭제 (값 확인용)
-//			System.out.println(lotto.get("drwtNo1") + " " + lotto.get("drwtNo2") + " " + lotto.get("drwtNo3") + " " + lotto.get("drwtNo4") + " " + lotto.get("drwtNo5") + " " + lotto.get("drwtNo6") + " " + lotto.get("bnusNo"));
+//			System.out.println(lotto.get("drwNo") + "회차 : " + lotto.get("drwtNo1") + " " + lotto.get("drwtNo2") + " " + lotto.get("drwtNo3") + " " + lotto.get("drwtNo4") + " " + lotto.get("drwtNo5") + " " + lotto.get("drwtNo6") + " +" + lotto.get("bnusNo"));
 
 			// 번호별 카운트
 			int drwtNo;
@@ -192,30 +202,30 @@ public class TestController {
 			}
 
 			// TODO : (옵션) 보너스 번호 카운트
-//			drwtNo = (int) (long) lotto.get("bnusNo");
-//			if (lottoNumCount.get(drwtNo) == null) {
-//				lottoNumCount.put(drwtNo, 1);
-//			} else {
-//				lottoNumCount.put(drwtNo, lottoNumCount.get(drwtNo) + 1);
-//			}
+			drwtNo = (int) (long) lotto.get("bnusNo");
+			if (lottoNumCount.get(drwtNo) == null) {
+				lottoNumCount.put(drwtNo, 1);
+			} else {
+				lottoNumCount.put(drwtNo, lottoNumCount.get(drwtNo) + 1);
+			}
 		}
 
 		return lottoNumCount;
 	}
 
-	private List<Entry<Integer, Integer>> getTopNLottoNum(ConcurrentHashMap<Integer, Integer> lottoNumCount) {
+	private List<Entry<Integer, Integer>> getTopNLottoNum(ConcurrentHashMap<Integer, Integer> lottoNumCount, int countTopN) {
 		return lottoNumCount.entrySet()
 			.stream()
-			.sorted((e1, e2) -> Integer.compare(e2.getValue(), e1.getValue())) // Sort by value.
-			.limit(10)
+			.sorted((e1, e2) -> Integer.compare(e2.getValue(), e1.getValue()))
+			.limit(countTopN)
 			.collect(Collectors.toList());
 	}
 
-	private List<Entry<Integer, Integer>> getBottomNLottoNum(ConcurrentHashMap<Integer, Integer> lottoNumCount) {
+	private List<Entry<Integer, Integer>> getBottomNLottoNum(ConcurrentHashMap<Integer, Integer> lottoNumCount, int countBottomN) {
 		return lottoNumCount.entrySet()
 			.stream()
-			.sorted((e1, e2) -> Integer.compare(e1.getValue(), e2.getValue())) // Sort by value.
-			.limit(10)
+			.sorted((e1, e2) -> Integer.compare(e1.getValue(), e2.getValue()))
+			.limit(countBottomN)
 			.collect(Collectors.toList());
 	}
 

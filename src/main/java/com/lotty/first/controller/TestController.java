@@ -7,12 +7,14 @@ import java.io.Reader;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -46,8 +48,8 @@ public class TestController {
 	/**
 	 *
 	 * prevLottoNum : 상위 N개 회차
-	 * countTopN : 가장 많이 나오는 번호 N개
-	 * countBottomN : 가장 적게 나오는 번호 N개
+	 * countTopN : 가장 많이 당첨된 N개 번호
+	 * countBottomN : 가장 적게 당첨된 N개 번호
 	 *
 	 **/
 	@GetMapping("/lotto")
@@ -63,10 +65,10 @@ public class TestController {
 		// 상위 N개 회차 로또번호 카운트
 		ConcurrentHashMap<Integer, Integer> lottoNumCount = countPrevLotto(prevLottoList, prevLottoNum == 0 ? 200 : prevLottoNum);
 
-		// 상위 N개 최대값, 인덱스 구하기
+		// 가장 많이 당첨된 N개 번호 카운트
 		List<Entry<Integer, Integer>> topNLottoNum = getTopNLottoNum(lottoNumCount, countTopN == 0 ? 18 : countTopN);
 
-		// 하위 N개 최대값, 인덱스 구하기
+		// 가장 적게 당첨된 N개 번호 카운트
 		List<Entry<Integer, Integer>> bottomNLottoNum = getBottomNLottoNum(lottoNumCount, counntBottomN == 0 ? 20 : counntBottomN);
 
 		// TODO : 삭제 (값 확인용)
@@ -237,24 +239,29 @@ public class TestController {
 		// TODO : 삭제 (값 확인용)
 //		System.out.println("randomNum1 : " + randomNum1 + ", randomNum2 : " + randomNum2);
 
-		return topNLottoNum.stream()
-			.collect(Collectors.collectingAndThen(Collectors.toList(), collected -> {
-			    Collections.shuffle(collected);
-			    return collected.stream();
-			}))
-			.limit(randomNum1)
-			.map(Map.Entry::getKey)
-			.sorted((e1, e2) -> Integer.compare(e1, e2))
-			.map(n -> n.toString())
-			.collect(Collectors.joining(" "))
-			+ " " +
-			bottomNLottoNum.stream()
-			.collect(Collectors.collectingAndThen(Collectors.toList(), collected -> {
-			    Collections.shuffle(collected);
-			    return collected.stream();
-			}))
-			.limit(randomNum2)
-			.map(Map.Entry::getKey)
+		// 가장 많이 당첨된 N개 번호
+		List<Integer> topNLottoNumRandom = topNLottoNum.stream()
+		.collect(Collectors.collectingAndThen(Collectors.toList(), collected -> {
+		    Collections.shuffle(collected);
+		    return collected.stream();
+		}))
+		.limit(randomNum1)
+		.map(Map.Entry::getKey)
+		.collect(Collectors.toList());
+
+		// 가장 적게 당첨된 N개 번호
+		List<Integer> bottomNLottoNumRandom = bottomNLottoNum.stream()
+		.collect(Collectors.collectingAndThen(Collectors.toList(), collected -> {
+		    Collections.shuffle(collected);
+		    return collected.stream();
+		}))
+		.limit(randomNum2)
+		.map(Map.Entry::getKey)
+		.collect(Collectors.toList());
+
+		// 가장 많이 나온 번호와 가장 적게 나온 번호를 합침
+		return Stream.of(topNLottoNumRandom, bottomNLottoNumRandom)
+			.flatMap(Collection::stream)
 			.sorted((e1, e2) -> Integer.compare(e1, e2))
 			.map(n -> n.toString())
 			.collect(Collectors.joining(" "));

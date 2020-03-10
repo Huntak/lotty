@@ -55,19 +55,19 @@ public class TestController {
 					 , @RequestParam(value = "countTopN", defaultValue = "0") int countTopN
 					 , @RequestParam(value = "counntBottomN", defaultValue = "0") int counntBottomN) {
 		// TODO : 삭제 (값 확인용)
-		System.out.println("prevLottoNum : " + prevLottoNum + ", countTopN : " + countTopN + ", counntBottomN : " + counntBottomN);
+//		System.out.println("prevLottoNum : " + prevLottoNum + ", countTopN : " + countTopN + ", counntBottomN : " + counntBottomN);
 
 		// 지난회차 로또번호 조회
 		JSONArray prevLottoList = readPrevLottoData();
 
 		// 상위 N개 회차 로또번호 카운트
-		ConcurrentHashMap<Integer, Integer> lottoNumCount = countPrevLotto(prevLottoList, prevLottoNum == 0 ? 100 : prevLottoNum);
+		ConcurrentHashMap<Integer, Integer> lottoNumCount = countPrevLotto(prevLottoList, prevLottoNum == 0 ? 200 : prevLottoNum);
 
 		// 상위 N개 최대값, 인덱스 구하기
 		List<Entry<Integer, Integer>> topNLottoNum = getTopNLottoNum(lottoNumCount, countTopN == 0 ? 18 : countTopN);
 
 		// 하위 N개 최대값, 인덱스 구하기
-		List<Entry<Integer, Integer>> bottomNLottoNum = getBottomNLottoNum(lottoNumCount, counntBottomN == 0 ? 18 : counntBottomN);
+		List<Entry<Integer, Integer>> bottomNLottoNum = getBottomNLottoNum(lottoNumCount, counntBottomN == 0 ? 20 : counntBottomN);
 
 		// TODO : 삭제 (값 확인용)
 //		topNLottoNum.forEach(l -> {
@@ -84,7 +84,8 @@ public class TestController {
 		// TODO : 당첨자가 제일 많은 날 top 10
 
 		// 로또번호 추천
-		String result = recommandLottoNum(topNLottoNum);
+		String result = "";
+		result = recommandLottoNum(topNLottoNum, bottomNLottoNum);
 
 		// TODO : 삭제 (값 확인용)
 		System.out.println(result);
@@ -182,7 +183,7 @@ public class TestController {
 		ConcurrentHashMap<Integer, Integer> lottoNumCount = new ConcurrentHashMap<>();
 
 		// 회차별로 쪼개서 번호별 카운트
-		for(int h = prevLottoList.size() - 1; h > prevLottoList.size() - prevLottoNum - 1; h--) {
+		for(int h = prevLottoList.size() - prevLottoNum; h < prevLottoList.size(); h++) {
 			// 로또 한 회차분
 			lotto = (JSONObject) prevLottoList.get(h);
 
@@ -229,17 +230,34 @@ public class TestController {
 			.collect(Collectors.toList());
 	}
 
-	private String recommandLottoNum(List<Entry<Integer, Integer>> topNLottoNum) {
+	private String recommandLottoNum(List<Entry<Integer, Integer>> topNLottoNum, List<Entry<Integer, Integer>> bottomNLottoNum) {
+		int randomNum1 = (int)(Math.random() * 5 + 1);
+		int randomNum2 = 6 - randomNum1;
+
+		// TODO : 삭제 (값 확인용)
+//		System.out.println("randomNum1 : " + randomNum1 + ", randomNum2 : " + randomNum2);
+
 		return topNLottoNum.stream()
 			.collect(Collectors.collectingAndThen(Collectors.toList(), collected -> {
 			    Collections.shuffle(collected);
 			    return collected.stream();
 			}))
-			.limit(6)
+			.limit(randomNum1)
 			.map(Map.Entry::getKey)
 			.sorted((e1, e2) -> Integer.compare(e1, e2))
 			.map(n -> n.toString())
-			.collect(Collectors.joining( " " ));
+			.collect(Collectors.joining(" "))
+			+ " " +
+			bottomNLottoNum.stream()
+			.collect(Collectors.collectingAndThen(Collectors.toList(), collected -> {
+			    Collections.shuffle(collected);
+			    return collected.stream();
+			}))
+			.limit(randomNum2)
+			.map(Map.Entry::getKey)
+			.sorted((e1, e2) -> Integer.compare(e1, e2))
+			.map(n -> n.toString())
+			.collect(Collectors.joining(" "));
 	}
 
 

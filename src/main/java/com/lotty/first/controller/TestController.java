@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -47,29 +48,43 @@ public class TestController {
 
 	/**
 	 *
-	 * prevLottoNum : 상위 N개 회차
-	 * countTopN : 가장 많이 당첨된 N개 번호
-	 * countBottomN : 가장 적게 당첨된 N개 번호
+	 * mode 1:최근 기준, 2:당첨금 높은 순, 3:당첨자 많은 순
+	 * prevLottoNum 상위 N개 회차
+	 * countTopN 가장 많이 당첨된 N개 번호
+	 * countBottomN 가장 적게 당첨된 N개 번호
+	 * gameNum 추천을 원하는 로또 게임 갯수
 	 *
 	 **/
 	@GetMapping("/lotto")
-	public String lotto(@RequestParam(value = "prevLottoNum", defaultValue = "0") int prevLottoNum
-					 , @RequestParam(value = "countTopN", defaultValue = "0") int countTopN
-					 , @RequestParam(value = "counntBottomN", defaultValue = "0") int counntBottomN) {
+	public String lotto(@RequestParam(value = "mode", defaultValue = "1") int mode
+					 , @RequestParam(value = "prevLottoNum", defaultValue = "200") int prevLottoNum
+					 , @RequestParam(value = "countTopN", defaultValue = "18") int countTopN
+					 , @RequestParam(value = "counntBottomN", defaultValue = "19") int counntBottomN
+					 , @RequestParam(value = "gameNum", defaultValue = "5") int gameNum) {
 		// TODO : 삭제 (값 확인용)
 //		System.out.println("prevLottoNum : " + prevLottoNum + ", countTopN : " + countTopN + ", counntBottomN : " + counntBottomN);
 
 		// 지난회차 로또번호 조회
 		JSONArray prevLottoList = readPrevLottoData();
 
-		// 상위 N개 회차 로또번호 카운트
-		ConcurrentHashMap<Integer, Integer> lottoNumCount = countPrevLotto(prevLottoList, prevLottoNum == 0 ? 200 : prevLottoNum);
+		// mode에 따라 다른 기준으로 상위 N개 회차 로또번호 카운트
+		ConcurrentHashMap<Integer, Integer> lottoNumCount;
+		if(mode == 2) {
+			// 당첨금 높은 순 기준
+			lottoNumCount = countPrevLotto(prevLottoList, prevLottoNum, "firstWinamnt");
+		} else if(mode == 3) {
+			// 당첨자가 많은 순 기준
+			lottoNumCount = countPrevLotto(prevLottoList, prevLottoNum, "firstPrzwnerCo");
+		} else {
+			// 최근 기준
+			lottoNumCount = countPrevLotto(prevLottoList, prevLottoNum, "drwNo");
+		}
 
 		// 가장 많이 당첨된 N개 번호 카운트
-		List<Entry<Integer, Integer>> topNLottoNum = getTopNLottoNum(lottoNumCount, countTopN == 0 ? 18 : countTopN);
+		List<Entry<Integer, Integer>> topNLottoNum = getTopNLottoNum(lottoNumCount, countTopN);
 
 		// 가장 적게 당첨된 N개 번호 카운트
-		List<Entry<Integer, Integer>> bottomNLottoNum = getBottomNLottoNum(lottoNumCount, counntBottomN == 0 ? 20 : counntBottomN);
+		List<Entry<Integer, Integer>> bottomNLottoNum = getBottomNLottoNum(lottoNumCount, counntBottomN);
 
 		// TODO : 삭제 (값 확인용)
 //		topNLottoNum.forEach(l -> {
@@ -81,13 +96,13 @@ public class TestController {
 //		});
 //		System.out.println("");
 
-		// TODO : 당첨금 수령액 높은 날 top 10
-
-		// TODO : 당첨자가 제일 많은 날 top 10
-
 		// 로또번호 추천
 		String result = "";
-		result = recommandLottoNum(topNLottoNum, bottomNLottoNum);
+		int gameIndex = 1;
+		while(gameIndex <= gameNum) {
+			result += gameIndex + "번 게임 : " + recommandLottoNum(topNLottoNum, bottomNLottoNum) + " <br>\n";
+			gameIndex++;
+		}
 
 		// TODO : 삭제 (값 확인용)
 		System.out.println(result);
@@ -107,9 +122,6 @@ public class TestController {
 		restTemplate.setMessageConverters(converters);
 
 		// parameter 세팅
-		MultiValueMap<String, String> map = new LinkedMultiValueMap<String, String>();
-		map.add("str", "thisistest");
-
 		JSONArray prevLottoList = new JSONArray();
 		JSONObject lotto = new JSONObject();
 		int index = 1;
@@ -178,19 +190,42 @@ public class TestController {
 		return prevLottoList;
 	}
 
-	private ConcurrentHashMap<Integer, Integer> countPrevLotto(JSONArray prevLottoList, int prevLottoNum) {
+	@SuppressWarnings("unchecked")
+	private ConcurrentHashMap<Integer, Integer> countPrevLotto(JSONArray prevLottoList, int prevLottoNum, String modeStandard) {
 		JSONObject lotto = new JSONObject();
 
 		// 번호별 카운트 변수
 		ConcurrentHashMap<Integer, Integer> lottoNumCount = new ConcurrentHashMap<>();
 
+		// 기준(modeStandard) 순으로 내림차순 정렬
+		ArrayList<JSONObject> sortedPrevLottoList = (ArrayList<JSONObject>) prevLottoList.stream()
+			.sorted(Comparator.comparing(a ->  (Long)((JSONObject) a).get(modeStandard)).reversed())
+			.limit(prevLottoNum)
+			.collect(Collectors.toList());
+
+		// TODO : 삭제 (값 확인용)
+//		for(int i = 0; i < sortedPrevLottoList.size(); i++){
+//			System.out.println(sortedPrevLottoList.get(i));
+//		}
+
 		// 회차별로 쪼개서 번호별 카운트
-		for(int h = prevLottoList.size() - prevLottoNum; h < prevLottoList.size(); h++) {
+		for(int h = 0; h < sortedPrevLottoList.size(); h++) {
 			// 로또 한 회차분
-			lotto = (JSONObject) prevLottoList.get(h);
+			lotto = (JSONObject) sortedPrevLottoList.get(h);
 
 			// TODO : 삭제 (값 확인용)
-//			System.out.println(lotto.get("drwNo") + "회차 : " + lotto.get("drwtNo1") + " " + lotto.get("drwtNo2") + " " + lotto.get("drwtNo3") + " " + lotto.get("drwtNo4") + " " + lotto.get("drwtNo5") + " " + lotto.get("drwtNo6") + " +" + lotto.get("bnusNo"));
+//			System.out.println(
+//				lotto.get("drwNo") + "회차 : "
+//				+ lotto.get("drwtNo1")
+//				+ " " + lotto.get("drwtNo2")
+//				+ " " + lotto.get("drwtNo3")
+//				+ " " + lotto.get("drwtNo4")
+//				+ " " + lotto.get("drwtNo5")
+//				+ " " + lotto.get("drwtNo6")
+//				+ " +" + lotto.get("bnusNo")
+//				+ "\t 해당 회차 1등 당첨금 : " + lotto.get("firstWinamnt")
+//				+ "\t 해당 회차 당첨금 총액 : " + lotto.get("firstAccumamnt")
+//				+ "\t 해당 회차 당첨자 수 : " + lotto.get("firstPrzwnerCo"));
 
 			// 번호별 카운트
 			int drwtNo;
